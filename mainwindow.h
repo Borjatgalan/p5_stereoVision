@@ -70,8 +70,8 @@ private:
 
     QTimer timer;
 
-    ImgViewer *visorS, *visorD, *visorS2, *visorD2;
-    Mat colorImage, grayImage, destColorImage, destGrayImage;
+    ImgViewer *visorS, *visorD, *visorS2, *visorGroundTruth;
+    Mat colorImage, grayImage, destColorImage, destGrayImage, groundTruthImage;
     bool winSelected, selectColorImage;
     Rect imageWindow;
     int idReg;
@@ -104,6 +104,7 @@ public slots:
     void selectWindow(QPointF p, int w, int h);
     void deselectWindow();
     void loadFromFile();
+    void loadGroundTruth();
     void saveToFile();
     void initialize();
     void segmentation();

@@ -26,6 +26,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     grayImage.create(240, 320, CV_8UC1);
     destColorImage.create(240, 320, CV_8UC3);
     destGrayImage.create(240, 320, CV_8UC1);
+    groundTruthImage.create(240,320,CV_8UC1);
     canny_image.create(240, 320, CV_8UC1);
     detected_edges.create(240, 320, CV_8UC1);
     imgRegiones.create(240,320, CV_32SC1);
@@ -36,6 +37,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     visorS = new ImgViewer(&grayImage, ui->imageFrameS);
     visorD = new ImgViewer(&destGrayImage, ui->imageFrameD);
+    visorGroundTruth = new ImgViewer(&groundTruthImage, ui->visorTDisp);
 
     connect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
     connect(ui->colorButton, SIGNAL(clicked(bool)), this, SLOT(change_color_gray(bool)));
@@ -43,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(visorS, SIGNAL(pressEvent()), this, SLOT(deselectWindow()));
 
     connect(ui->loadButton, SIGNAL(pressed()), this, SLOT(loadFromFile()));
+    connect(ui->loadButton_2, SIGNAL(pressed()),this,SLOT(loadGroundTruth()));
 
 
 
@@ -68,6 +71,7 @@ void MainWindow::compute()
     }
     visorS->update();
     visorD->update();
+    visorGroundTruth->update();
 }
 
 
@@ -146,6 +150,35 @@ void MainWindow::loadFromFile()
             colorImage.copyTo(destColorImage);
         else
             grayImage.copyTo(destGrayImage);
+        connect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
+    }
+}
+
+void MainWindow::loadGroundTruth()
+{
+    disconnect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
+
+    Mat image;
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open"), "/home", tr("Images (*.jpg *.png "
+                                                                                  "*.jpeg *.gif);;All Files(*)"));
+    image = cv::imread(fileName.toStdString());
+
+    if (fileName.isEmpty())
+        return;
+    else
+    {
+        QFile file(fileName);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            QMessageBox::information(this, tr("Unable to open file"), file.errorString());
+            return;
+        }
+        ui->loadButton_2->setChecked(false);
+        ui->captureButton->setText("Start capture");
+        cv::resize(image, groundTruthImage, Size(320, 240));
+        cvtColor(groundTruthImage, groundTruthImage, COLOR_BGR2RGB);
+        cvtColor(groundTruthImage, groundTruthImage, COLOR_RGB2GRAY);
+
         connect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
     }
 }
@@ -568,15 +601,6 @@ void MainWindow::initDisparity()
 }
 
 
-//    //Calcular el valor medio de la disparidad de cada region a partir de los puntos fijos
-//    float avg = 0;
-//    for(size_t i = 0; i < listRegiones.size(); i++){
-//        for(int j = 0; j < listRegiones[i].nPuntosFijos; j++){
 
-//        }
-//        listRegiones[i].dMedia = avg / listRegiones[i].nPuntosFijos;
-//    }
-
-}
 
 
