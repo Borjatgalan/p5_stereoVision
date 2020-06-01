@@ -5,7 +5,7 @@
 #include <opencv2/highgui.hpp>
 
 /**
- * P4 - Image Segmentation
+ * P5 - Stereo Vision
  * Ivan González Domínguez
  * Borja Alberto Tirado Galán
  *
@@ -17,7 +17,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 {
     ui->setupUi(this);
 
-    cap = new VideoCapture(0);
     winSelected = false;
     selectColorImage = false;
     initVecinos();
@@ -31,19 +30,20 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     detected_edges.create(240, 320, CV_8UC1);
     imgRegiones.create(240,320, CV_32SC1);
     imgMask.create(240, 320, CV_8UC1);
+    corners.create(240, 320, CV_8UC1);
+    fijos.create(240, 320, CV_8UC1);
+    disparidad.create(240, 320, CV_32FC1);
 
     visorS = new ImgViewer(&grayImage, ui->imageFrameS);
     visorD = new ImgViewer(&destGrayImage, ui->imageFrameD);
 
     connect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
-    connect(ui->captureButton, SIGNAL(clicked(bool)), this, SLOT(start_stop_capture(bool)));
     connect(ui->colorButton, SIGNAL(clicked(bool)), this, SLOT(change_color_gray(bool)));
     connect(visorS, SIGNAL(windowSelected(QPointF, int, int)), this, SLOT(selectWindow(QPointF, int, int)));
     connect(visorS, SIGNAL(pressEvent()), this, SLOT(deselectWindow()));
 
     connect(ui->loadButton, SIGNAL(pressed()), this, SLOT(loadFromFile()));
 
-    connect(ui->showBottomUp_checkbox, SIGNAL(clicked()), this, SLOT(segmentation()));
 
 
 
@@ -53,27 +53,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 MainWindow::~MainWindow()
 {
     delete ui;
-    delete cap;
     delete visorS;
     delete visorD;
 }
 
 void MainWindow::compute()
 {
-    //Captura de imagen
 
-    if (ui->captureButton->isChecked() && cap->isOpened())
-    {
-        *cap >> colorImage;
-
-        cv::resize(colorImage, colorImage, Size(320, 240));
-        cvtColor(colorImage, grayImage, COLOR_BGR2GRAY);
-        cvtColor(colorImage, colorImage, COLOR_BGR2RGB);
-    }
-
-    if(ui->showBottomUp_checkbox->isChecked()){
-        segmentation();
-    }
 
 
     if (winSelected)
@@ -84,13 +70,7 @@ void MainWindow::compute()
     visorD->update();
 }
 
-void MainWindow::start_stop_capture(bool start)
-{
-    if (start)
-        ui->captureButton->setText("Stop capture");
-    else
-        ui->captureButton->setText("Start capture");
-}
+
 
 void MainWindow::change_color_gray(bool color)
 {
@@ -237,6 +217,7 @@ void MainWindow::initialize(){
  * @brief MainWindow::segmentation
  */
 void MainWindow::segmentation(){
+    /*
     initialize();
     idReg = 0;
     Point seedPoint;
@@ -313,7 +294,7 @@ void MainWindow::segmentation(){
     asignarBordesARegion();
     vecinosFrontera();
     bottomUp();
-
+*/
 }
 /** Metodo que agrega a la lista los puntos frontera de la imagen
  * @brief MainWindow::vecinosFrontera
@@ -475,5 +456,113 @@ void MainWindow::mostrarListaRegiones()
     }
 }
 
+// Generamos las listas de esquinas de winI y winD
+void MainWindow::cornerDetection()
+{
+    Mat dst, dstD;
+    dst.create(240, 320, CV_32FC1);
+    dstD.create(240, 320, CV_32FC1);
+
+    cornerList.clear();
+    cornerListD.clear();
+    float threshold = 0.00001;
+    dst = Mat::zeros(grayImage.size(), CV_32FC1);
+    dstD =Mat::zeros(destGrayImage.size(), CV_32FC1);
+
+
+    //Metodo que calcula las esquinas
+    cv::cornerHarris(grayImage, dst, 5, 3, 0.08);
+    cv::cornerHarris(destGrayImage, dstD, 5, 3, 0.08);
+
+    //Almacenamiento de las esquinas en una lista
+    for (int x = 0; x < dst.rows; x++){
+        for (int y = 0; y < dst.cols; y++){
+            if (dst.at<float>(x, y) > threshold)
+            {
+                punto p;
+                p.point = Point(y, x);
+                p.valor = dst.at<float>(x, y);
+                cornerList.push_back(p);
+            }
+
+            if (dstD.at<float>(x, y) > threshold)
+            {
+                punto p;
+                p.point = Point(y, x);
+                p.valor = dst.at<float>(x, y);
+                cornerListD.push_back(p);
+            }
+        }
+    }
+    //Lista ordenada de esquinas
+    std::sort(cornerList.begin(), cornerList.end(), puntoCompare());
+    std::sort(cornerListD.begin(), cornerListD.end(), puntoCompare());
+
+    //Supresion del no maximo en cornerList
+    for (int i = 0; i < (int)cornerList.size(); i++){
+        for (int j = i + 1; j < (int)cornerList.size(); j++){
+            if (abs(cornerList[i].point.x - cornerList[j].point.x) < 5 &&
+                    abs(cornerList[i].point.y - cornerList[j].point.y) < 5)
+            {
+
+                cornerList.erase(cornerList.begin() + j);
+                j--;
+            }
+        }
+    }
+    //Supresion del no maximo en cornerListD
+    for (int i = 0; i < (int)cornerListD.size(); i++){
+        for (int j = i + 1; j < (int)cornerListD.size(); j++){
+            if (abs(cornerListD[i].point.x - cornerListD[j].point.x) < 5 &&
+                    abs(cornerListD[i].point.y - cornerListD[j].point.y) < 5)
+            {
+
+                cornerListD.erase(cornerListD.begin() + j);
+                j--;
+            }
+        }
+    }
+
+
+
+}
+
+void MainWindow::initDisparity()
+{
+    float umbral = 0.8;
+    //    Buscar la esquina mas similar de la imagen dcha en la misma fila
+    for(size_t it = 0; it < cornerList.size(); it++){
+        int xI = cornerList[it].point.x;
+        int yI = cornerList[it].point.y;
+        for(size_t itD = 0; itD < cornerListD.size(); itD++){
+            int xD = cornerListD[it].point.x;
+            int yD = cornerListD[it].point.y;
+            if(yI == yD){
+                Mat winI = destGrayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
+                Mat winD = grayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
+                Mat result; //resultado en (0,0) de tipo float
+
+                result.create(1, 1, CV_32F);
+                matchTemplate(winI,winD,result,TM_CCOEFF_NORMED);
+                //Comprobamos si cumple un valor de correspondencia aceptable
+                if(result.at<float>(0) >= umbral){
+                    fijos.at<uchar>(yI, xI) = 1;
+                    disparidad.at<float>(yI, xI) = xI - xD;
+                    listRegiones[imgRegiones.at<int>(yI, xI)].nPuntosFijos++;
+
+                }
+            }
+        }
+    }
+    //Calcular el valor medio de la disparidad de cada region a partir de los puntos fijos
+    float avg = 0;
+    for(size_t i = 0; i < listRegiones.size(); i++){
+        for(int j = 0; j < listRegiones[i].nPuntosFijos; j++){
+
+        }
+        listRegiones[i].dMedia = avg / listRegiones[i].nPuntosFijos;
+    }
+
+}
 
 

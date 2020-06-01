@@ -15,9 +15,10 @@
 
 #include <QtWidgets/QFileDialog>
 
+#define W 11
 
 /**
- * P4 - Image Segmentation
+ * P5 - Stereo Vision
  * Ivan González Domínguez
  * Borja Alberto Tirado Galán
  *
@@ -27,7 +28,7 @@
 using namespace cv;
 
 namespace Ui {
-    class MainWindow;
+class MainWindow;
 }
 
 
@@ -52,8 +53,11 @@ public:
         int id;
         Point pIni;
         int nPuntos;
-        uchar gMedio; //valor gris medio
+        int nPuntosFijos;
+        uchar gMedio;   //valor gris medio
         Vec3b rgbMedio; //valor color medio
+        float dMedia; //valor de disparidad media
+        std::vector<Point> pFijos;
         std::vector<Point> frontera;
     }Region;
 
@@ -66,36 +70,35 @@ private:
 
     QTimer timer;
 
-    VideoCapture *cap;
-    ImgViewer *visorS, *visorD, *visorHistoS, *visorHistoD;
+    ImgViewer *visorS, *visorD, *visorS2, *visorD2;
     Mat colorImage, grayImage, destColorImage, destGrayImage;
     bool winSelected, selectColorImage;
     Rect imageWindow;
     int idReg;
+    int width;          //Anchura de la imagen original
 
+    Mat corners;        //Mat de esquinas
     Mat imgRegiones;
     Mat imgMask;
     Mat detected_edges;
-    Mat canny_image; //Mat de canny    
-    Rect minRect; //Minima ventana de los puntos modificados (añadidos a la region)
+    Mat canny_image;    //Mat de canny
+    Mat fijos;
+    Mat disparidad;
+    Rect minRect;       //Minima ventana de los puntos modificados (añadidos a la region)
     Region r;
 
-    std::vector<Region> listRegiones;
-    std::vector<Point> vecinos;
-    /*
-    * cornerList[0] = Point
-    * cornerList[1] = Valor de Point */
-   std::vector<punto> cornerList;
-   // Vector de lineas
-   std::vector<QLine> lineList;
-   // Vector de puntos validos
-   std::vector<Point> pCorte;
-   //Vector de segmentos
-   std::vector<QLine> segmentList;
+
+    std::vector<Region> listRegiones;   //Lista de regiones
+    std::vector<punto> listDisparidades;
+    std::vector<Point> vecinos;         //Lista de vecinos
+    std::vector<punto> cornerList;      //Lista de esquinas
+    std::vector<punto> cornerListD;      //Lista de esquinas
+    std::vector<QLine> lineList;        //Lista de lineas
+    std::vector<Point> pCorte;          //Lista de puntos validos
+    std::vector<QLine> segmentList;     //Lista de segmentos
 
 public slots:
     void compute();
-    void start_stop_capture(bool start);
     void change_color_gray(bool color);
     void selectWindow(QPointF p, int w, int h);
     void deselectWindow();
@@ -109,6 +112,9 @@ public slots:
     void bottomUp();
     void asignarBordesARegion();
     void mostrarListaRegiones();
+
+    void cornerDetection();
+    void initDisparity();
 };
 
 
