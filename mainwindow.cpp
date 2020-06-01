@@ -523,45 +523,59 @@ void MainWindow::cornerDetection()
         }
     }
 
+    for (size_t i = 0 ;i < cornerList.size();i++) {
+        corners.at<uchar>(cornerList[i].point.y, cornerList[i].point.x) = 1;
+    }
+
+    for (size_t i = 0 ;i < cornerListD.size();i++) {
+        cornersD.at<uchar>(cornerListD[i].point.y, cornerListD[i].point.x) = 1;
+    }
 
 
 }
 
 void MainWindow::initDisparity()
 {
+    Mat result; //resultado en (0,0) de tipo float
+    Mat mejorR; //mejor resultado
+    result.create(1, 1, CV_32F);
+    mejorR.create(1, 1, CV_32F);
     float umbral = 0.8;
-    //    Buscar la esquina mas similar de la imagen dcha en la misma fila
+    int xD = 0;
+
     for(size_t it = 0; it < cornerList.size(); it++){
         int xI = cornerList[it].point.x;
         int yI = cornerList[it].point.y;
-        for(size_t itD = 0; itD < cornerListD.size(); itD++){
-            int xD = cornerListD[it].point.x;
-            int yD = cornerListD[it].point.y;
-            if(yI == yD){
+        result.setTo(0);    //Resultado de similitud
+        mejorR.setTo(0);    //Mejor valor de similtud hasta ahora
+        for(xD = 0; xD < cornersD.cols; xD++){
+            if(cornersD.at<uchar>(yI, xD) == 1){
                 Mat winI = destGrayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
                 Mat winD = grayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
-                Mat result; //resultado en (0,0) de tipo float
-
-                result.create(1, 1, CV_32F);
                 matchTemplate(winI,winD,result,TM_CCOEFF_NORMED);
-                //Comprobamos si cumple un valor de correspondencia aceptable
-                if(result.at<float>(0) >= umbral){
-                    fijos.at<uchar>(yI, xI) = 1;
-                    disparidad.at<float>(yI, xI) = xI - xD;
-                    listRegiones[imgRegiones.at<int>(yI, xI)].nPuntosFijos++;
-
+                if(result.at<float>(0) >= mejorR.at<float>(0)){
+                    mejorR.at<float>(0) = result.at<float>(0);
                 }
             }
         }
-    }
-    //Calcular el valor medio de la disparidad de cada region a partir de los puntos fijos
-    float avg = 0;
-    for(size_t i = 0; i < listRegiones.size(); i++){
-        for(int j = 0; j < listRegiones[i].nPuntosFijos; j++){
-
+        //Comprobamos si cumple un valor de correspondencia aceptable
+        if(mejorR.at<float>(0) >= umbral){
+            fijos.at<uchar>(yI, xI) = 1;
+            disparidad.at<float>(yI, xI) = xI - xD;
         }
-        listRegiones[i].dMedia = avg / listRegiones[i].nPuntosFijos;
     }
+
+}
+
+
+//    //Calcular el valor medio de la disparidad de cada region a partir de los puntos fijos
+//    float avg = 0;
+//    for(size_t i = 0; i < listRegiones.size(); i++){
+//        for(int j = 0; j < listRegiones[i].nPuntosFijos; j++){
+
+//        }
+//        listRegiones[i].dMedia = avg / listRegiones[i].nPuntosFijos;
+//    }
 
 }
 

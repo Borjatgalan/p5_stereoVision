@@ -77,7 +77,8 @@ private:
     int idReg;
     int width;          //Anchura de la imagen original
 
-    Mat corners;        //Mat de esquinas
+    Mat corners;        //Mat de esquinas izquierda
+    Mat cornersD;       //Mat de esquinas derecha
     Mat imgRegiones;
     Mat imgMask;
     Mat detected_edges;
