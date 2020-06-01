@@ -570,34 +570,33 @@ void MainWindow::cornerDetection()
 void MainWindow::initDisparity()
 {
     Mat result; //resultado en (0,0) de tipo float
-    Mat mejorR; //mejor resultado
+    float mejorR; //mejor resultado
     result.create(1, 1, CV_32F);
-    mejorR.create(1, 1, CV_32F);
     float umbral = 0.8;
     int xD = 0;
-
+    int mejorxD = 0;
     for(size_t it = 0; it < cornerList.size(); it++){
         int xI = cornerList[it].point.x;
         int yI = cornerList[it].point.y;
         result.setTo(0);    //Resultado de similitud
-        mejorR.setTo(0);    //Mejor valor de similtud hasta ahora
+        mejorR = 0;    //Mejor valor de similtud hasta ahora
         for(xD = 0; xD < cornersD.cols; xD++){
             if(cornersD.at<uchar>(yI, xD) == 1){
                 Mat winI = destGrayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
                 Mat winD = grayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
                 matchTemplate(winI,winD,result,TM_CCOEFF_NORMED);
-                if(result.at<float>(0) >= mejorR.at<float>(0)){
-                    mejorR.at<float>(0) = result.at<float>(0);
+                if(result.at<float>(0) >= mejorR){
+                    mejorR = result.at<float>(0);
+                    mejorxD = xD;
                 }
             }
         }
         //Comprobamos si cumple un valor de correspondencia aceptable
-        if(mejorR.at<float>(0) >= umbral){
+        if(mejorR >= umbral){
             fijos.at<uchar>(yI, xI) = 1;
-            disparidad.at<float>(yI, xI) = xI - xD;
+            disparidad.at<float>(yI, xI) = xI - mejorxD;
         }
     }
-
 }
 
 
