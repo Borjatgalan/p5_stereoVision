@@ -32,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     imgRegiones.create(240,320, CV_32SC1);
     imgMask.create(240, 320, CV_8UC1);
     corners.create(240, 320, CV_8UC1);
+    cornersD.create(240, 320, CV_8UC1);
     fijos.create(240, 320, CV_8UC1);
     disparidad.create(240, 320, CV_32FC1);
 
@@ -80,7 +81,6 @@ void MainWindow::compute()
  */
 void MainWindow::initProcess()
 {
-    //GRUPO (2/06): Revisar segmentacion
     segmentation();
 //    initDisparity();
 //    initDisparity2();
@@ -165,10 +165,9 @@ void MainWindow::cornerDetection()
         corners.at<uchar>(cornerList[i].point.y, cornerList[i].point.x) = 1;
     }
 
-// GRUPO (2/06): Nos da error inicializar aqui el mapa de esquinas de la ventana derecha
-//    for (size_t k = 0 ; k < cornerListD.size();  k++) {
-//        cornersD.at<uchar>(cornerListD[k].point.y, cornerListD[k].point.x) = 1;
-//    }
+    for (size_t k = 0 ; k < cornerListD.size();  k++) {
+        cornersD.at<uchar>(cornerListD[k].point.y, cornerListD[k].point.x) = 1;
+    }
 }
 
 
@@ -314,7 +313,11 @@ void MainWindow::initialize(){
     int lowThreshold = 40;
     int const maxThreshold = 120;
     // Reduce noise with a kernel 3x3
-    blur(grayImage, detected_edges, Size(3, 3));
+
+    // PILAR (02/06): es mejor no suavizar la imagen para esta aplicación. De esta forma, se obtienen más esquinas
+    //blur(grayImage, detected_edges, Size(3, 3));
+    // PILAR (02/06): incluyo copia de grayImage en detected_edges para que el resto del código no se vea afectado por este cambio
+    grayImage.copyTo(detected_edges);
 
     // Canny detector
     cv::Canny(detected_edges, canny_image, lowThreshold, maxThreshold, 3);
@@ -341,7 +344,8 @@ void MainWindow::segmentation(){
     Point seedPoint;
     int grisAcum;
     int flags = 4|(1 << 8)| FLOODFILL_MASK_ONLY | FLOODFILL_FIXED_RANGE;
-
+//GRUPO (2/06): Tenemos dudas de como procesar la segmentacion en este caso
+// PILAR (02/06): igual que en la práctica anterior. La diferencia es que ahora debéis fijar los parámetros libres que teníamos en la práctica 4
 //    for(int i = 0; i < imgRegiones.rows; i++){
 //        for(int j = 0; j < imgRegiones.cols; j++){
 //            if(imgRegiones.at<int>(i,j) == -1 && detected_edges.at<uchar>(i,j) != 255){
@@ -371,7 +375,7 @@ void MainWindow::segmentation(){
 //    idReg++;
 
 
-    // ######### POST-PROCESAMIENTO #########
+//    // ######### POST-PROCESAMIENTO #########
 
 //    asignarBordesARegion();
 //    vecinosFrontera();
