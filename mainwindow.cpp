@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->loadButton_2, SIGNAL(pressed()),this,SLOT(loadGroundTruth()));
     connect(ui->loadButton_3, SIGNAL(pressed()),this,SLOT(loadFromFile2()));
     connect(ui->initButton, SIGNAL(pressed()),this,SLOT(initProcess()));
-    connect(ui->corners_checkbox, SIGNAL(pressed()),this,SLOT(cornerDetection()));
+    connect(ui->corners_checkbox, SIGNAL(pressed()),this,SLOT(printCorners()));
 
     connect(visorS2, SIGNAL(windowSelected(QPointF,int,int)), this, SLOT(printLCDdisparity(QPointF)));
 
@@ -70,6 +70,7 @@ void MainWindow::compute()
     }
 
 
+
     visorS->update();
     visorD->update();
     visorS2->update();
@@ -82,10 +83,11 @@ void MainWindow::compute()
 void MainWindow::initProcess()
 {
     segmentation();
-//    initDisparity();
-//    initDisparity2();
-//    allocate_non_fixed_points();
-//    printDisparity();
+    cornerDetection();
+    initDisparity();
+    initDisparity2();
+    allocate_non_fixed_points();
+    printDisparity();
 
 }
 
@@ -329,7 +331,7 @@ void MainWindow::initialize(){
 
 }
 
-/** SE ENCARGA DEL PROCESAMIENTO DE LA IMAGEN
+/** Procesamiento de la imagen
  * @brief MainWindow::segmentation
  */
 void MainWindow::segmentation(){
@@ -340,13 +342,13 @@ void MainWindow::segmentation(){
     Point seedPoint;
     int grisAcum;
     int flags = 4|(1 << 8)| FLOODFILL_MASK_ONLY | FLOODFILL_FIXED_RANGE;
-//GRUPO (2/06):
+
     for(int i = 0; i < imgRegiones.rows; i++){
         for(int j = 0; j < imgRegiones.cols; j++){
             if(imgRegiones.at<int>(i,j) == -1 && detected_edges.at<uchar>(i,j) != 255){
                 seedPoint.x = j;
                 seedPoint.y = i;
-//                Comprobación de rango flotante
+                //Comprobación de rango flotante
                 cv::floodFill(grayImage, imgMask, seedPoint,idReg, &minRect,Scalar(30), Scalar(30), flags);
 
                 grisAcum = 0;
@@ -362,12 +364,10 @@ void MainWindow::segmentation(){
                         imgRegiones.at<int>(z, k) = idReg;
                     }
                 }
-
                 r.gMedio = grisAcum / r.nPuntos;
                 listRegiones.push_back(r);
                 idReg++;
             }
-
         }
     }
 
@@ -375,31 +375,8 @@ void MainWindow::segmentation(){
     // ######### POST-PROCESAMIENTO #########
 
     asignarBordesARegion();
-    vecinosFrontera();
-    bottomUp();
 }
-/** Metodo que agrega a la lista los puntos frontera de la imagen
- * @brief MainWindow::vecinosFrontera
- */
-void MainWindow::vecinosFrontera()
-{
-    int vx = 0, vy = 0, id = 0;
-    for(int x = 0; x < imgRegiones.rows; x++){
-        for(int y = 0; y <imgRegiones.cols; y++){
-            for(size_t i = 0; i < vecinos.size(); i++){
-                vx = vecinos[i].x;
-                vy = vecinos[i].y;
-                if(((x + vx) < imgRegiones.rows) && ((y + vy) < imgRegiones.cols)){
-                    if(imgRegiones.at<int>(x, y) != imgRegiones.at<int>(x+vx, y+vy)){
-                        id=imgRegiones.at<int>(x, y);
-                        listRegiones[id].frontera.push_back(Point(y, x));
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
+
 
 /** Metodo que visita los 8 vecinos para elegir el más similar al punto central y devuelve el identificador de region.
  * @brief MainWindow::vecinoMasSimilar
@@ -457,30 +434,6 @@ void MainWindow::initVecinos()
 
 }
 
-/** Asigna en destGrayImage los valores de gris medio que se encuentran en la imagen y en la lista de regiones
- * @brief MainWindow::bottomUp
- */
-void MainWindow::bottomUp()
-{
-    int id = 0;
-    uchar valor = 0;
-    Mat imgGris;
-    imgGris.create(240, 320, CV_8UC1);
-
-    for(int y = 0; y < imgRegiones.rows; y++){
-        for(int x = 0; x <imgRegiones.cols; x++){
-            id = imgRegiones.at<int>(y,x);
-            if(id == -1){
-                imgGris.at<uchar>(y,x) = 0;
-            }else{
-                valor = listRegiones[id].gMedio;
-                imgGris.at<uchar>(y,x) = valor;
-            }
-        }
-    }
-//    imgGris.copyTo(destGrayImage);
-}
-
 /** Metodo encargado de asignar los bordes a una de las posibles regiones de la imagen
  * @brief MainWindow::asignarBordesARegion
  */
@@ -530,20 +483,21 @@ void MainWindow::initDisparity()
     int xD = 0;
     int mejorxD = 0;
 
-
     for(size_t it = 0; it < cornerList.size(); it++){
         int xI = cornerList[it].point.x;
         int yI = cornerList[it].point.y;
         result.setTo(0);    //Resultado de similitud
-        mejorR = 0;    //Mejor valor de similtud hasta ahora
+        mejorR = 0;         //Mejor valor de similtud hasta ahora
         for(xD = 0; xD < cornersD.cols; xD++){
-            if(cornersD.at<uchar>(yI, xD) == 1){
-                Mat winI = destGrayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
-                Mat winD = grayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
-                matchTemplate(winI,winD,result,TM_CCOEFF_NORMED);
-                if(result.at<float>(0) >= mejorR){
-                    mejorR = result.at<float>(0);
-                    mejorxD = xD;
+            if((xI-W/2) >= 0 && (xI+W/2) < 320 && (xD-W/2) >= 0 && (xD+W/2) < 320 && (yI-W/2) >= 0 && (yI+W/2)<240){
+                if(cornersD.at<uchar>(yI, xD) == 1){
+                    Mat winI = destGrayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
+                    Mat winD = grayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
+                    matchTemplate(winI,winD,result,TM_CCOEFF_NORMED);
+                    if(result.at<float>(0) >= mejorR){
+                        mejorR = result.at<float>(0);
+                        mejorxD = xD;
+                    }
                 }
             }
         }
@@ -622,7 +576,7 @@ void MainWindow::printDisparity()
     for(int i = 0; i < destGrayImage2.rows; i++){
         for(int j = 0; j < destGrayImage2.cols; j++){
             gris = disparidad.at<float>(i,j) * 3. * width/320.; //Resolucion original de las camaras
-            destGrayImage2.at<uchar>(i,j) = gris;
+            destGrayImage2.at<uchar>(i,j) = (uchar) gris;
         }
     }
 }

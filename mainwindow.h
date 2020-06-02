@@ -57,7 +57,6 @@ public:
         uchar gMedio;   //valor gris medio
         Vec3b rgbMedio; //valor color medio
         float dMedia; //valor de disparidad media
-        std::vector<Point> frontera;
     }Region;
 
     explicit MainWindow(QWidget *parent = 0);
@@ -108,8 +107,6 @@ public slots:
     void segmentation();
     void initVecinos();
     int vecinoMasSimilar(int x, int y);
-    void vecinosFrontera();
-    void bottomUp();
     void asignarBordesARegion();
     void mostrarListaRegiones();
 
