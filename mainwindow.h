@@ -57,7 +57,6 @@ public:
         uchar gMedio;   //valor gris medio
         Vec3b rgbMedio; //valor color medio
         float dMedia; //valor de disparidad media
-        std::vector<Point> pFijos;
         std::vector<Point> frontera;
     }Region;
 
@@ -71,7 +70,7 @@ private:
     QTimer timer;
 
     ImgViewer *visorS, *visorD, *visorS2, *visorGroundTruth;
-    Mat colorImage, grayImage, destColorImage, destGrayImage, groundTruthImage;
+    Mat colorImage, grayImage, destColorImage, destGrayImage, destGrayImage2, groundTruthImage;
     bool winSelected, selectColorImage;
     Rect imageWindow;
     int idReg;
@@ -79,31 +78,30 @@ private:
 
     Mat corners;        //Mat de esquinas izquierda
     Mat cornersD;       //Mat de esquinas derecha
-    Mat imgRegiones;
-    Mat imgMask;
-    Mat detected_edges;
+    Mat imgRegiones;    //Imagen de regiones
+    Mat imgMask;        //Imagen de mascara
+    Mat detected_edges; //Mat de bordes
     Mat canny_image;    //Mat de canny
-    Mat fijos;
-    Mat disparidad;
+    Mat fijos;          //Mat de puntos fijos
+    Mat disparidad;     //Mapa de disparidad
     Rect minRect;       //Minima ventana de los puntos modificados (añadidos a la region)
-    Region r;
+    Region r;           //Estructura de tipo Region
 
 
     std::vector<Region> listRegiones;   //Lista de regiones
-    std::vector<punto> listDisparidades;
     std::vector<Point> vecinos;         //Lista de vecinos
-    std::vector<punto> cornerList;      //Lista de esquinas
-    std::vector<punto> cornerListD;      //Lista de esquinas
+    std::vector<punto> cornerList;      //Lista de esquinas ventana izquierda
+    std::vector<punto> cornerListD;     //Lista de esquinas ventana derecha
     std::vector<QLine> lineList;        //Lista de lineas
     std::vector<Point> pCorte;          //Lista de puntos validos
     std::vector<QLine> segmentList;     //Lista de segmentos
 
 public slots:
     void compute();
-    void change_color_gray(bool color);
     void selectWindow(QPointF p, int w, int h);
     void deselectWindow();
     void loadFromFile();
+    void loadFromFile2();
     void loadGroundTruth();
     void saveToFile();
     void initialize();
@@ -115,8 +113,15 @@ public slots:
     void asignarBordesARegion();
     void mostrarListaRegiones();
 
+    //Metodos practica 5
+    void initProcess();
     void cornerDetection();
     void initDisparity();
+    void initDisparity2();
+    void allocate_non_fixed_points();
+    void printCorners();
+    void printDisparity();
+    void printLCDdisparity(QPointF punto);
 };
 
 
