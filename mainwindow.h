@@ -81,7 +81,7 @@ private:
     Mat imgMask;        //Imagen de mascara
     Mat detected_edges; //Mat de bordes
     Mat canny_image;    //Mat de canny
-    Mat fijos;          //Mat de puntos fijos
+    Mat fijos;          //Mat de puntos fijos de la imagen izquierda
     Mat disparidad;     //Mapa de disparidad
     Rect minRect;       //Minima ventana de los puntos modificados (añadidos a la region)
     Region r;           //Estructura de tipo Region

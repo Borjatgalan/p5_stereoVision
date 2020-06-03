@@ -70,7 +70,6 @@ void MainWindow::compute()
     }
 
 
-
     visorS->update();
     visorD->update();
     visorS2->update();
@@ -104,14 +103,14 @@ void MainWindow::cornerDetection()
 
     cornerList.clear();
     cornerListD.clear();
-    float threshold = 0.00001;
+    float threshold = 0.000001;
     dst = Mat::zeros(grayImage.size(), CV_32FC1);
     dstD =Mat::zeros(destGrayImage.size(), CV_32FC1);
 
 
     //Metodo que calcula las esquinas
-    cv::cornerHarris(grayImage, dst, 5, 3, 0.08);
-    cv::cornerHarris(destGrayImage, dstD, 5, 3, 0.08);
+    cv::cornerHarris(grayImage, dst, 5, 3, 0.04);
+    cv::cornerHarris(destGrayImage, dstD, 5, 3, 0.04);
 
 
     //Almacenamiento de las esquinas en una lista
@@ -129,7 +128,7 @@ void MainWindow::cornerDetection()
             {
                 punto p;
                 p.point = Point(y, x);
-                p.valor = dst.at<float>(x, y);
+                p.valor = dstD.at<float>(x, y);
                 cornerListD.push_back(p);
             }
         }
@@ -163,10 +162,12 @@ void MainWindow::cornerDetection()
         }
     }
     //Inicializamos el mapa de esquinas de la ventana izquierda
+    corners.setTo(0);
     for (size_t i = 0 ; i < cornerList.size(); i++) {
         corners.at<uchar>(cornerList[i].point.y, cornerList[i].point.x) = 1;
     }
 
+    cornersD.setTo(0);
     for (size_t k = 0 ; k < cornerListD.size();  k++) {
         cornersD.at<uchar>(cornerListD[k].point.y, cornerListD[k].point.x) = 1;
     }
@@ -222,9 +223,10 @@ void MainWindow::loadFromFile()
         }
 
         image = cv::imread(fileName.toStdString());
+        width = image.cols;
         cv::resize(image, image, Size(320, 240));
         cvtColor(image, grayImage, COLOR_RGB2GRAY);
-        width = image.cols;
+        //width = image.cols; PILAR (02/06): hay que coger el ancho antes de redimensionar la imagen
         connect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
     }
 }
@@ -251,7 +253,7 @@ void MainWindow::loadFromFile2()
         image = cv::imread(fileName.toStdString());
         cv::resize(image, image, Size(320, 240));
         cvtColor(image, destGrayImage, COLOR_RGB2GRAY);
-        width = image.cols;
+        //width = image.cols; PILAR (02/06): hay que coger el ancho antes de redimensionar la imagen
         connect(&timer, SIGNAL(timeout()), this, SLOT(compute()));
     }
 }
@@ -335,16 +337,17 @@ void MainWindow::initialize(){
  * @brief MainWindow::segmentation
  */
 void MainWindow::segmentation(){
-
+    //Proceso de inicializacion de estructuras
     initialize();
 
     idReg = 0;
     Point seedPoint;
     int grisAcum;
     int flags = 4|(1 << 8)| FLOODFILL_MASK_ONLY | FLOODFILL_FIXED_RANGE;
-
+    //Recorremos la imagen de regiones
     for(int i = 0; i < imgRegiones.rows; i++){
         for(int j = 0; j < imgRegiones.cols; j++){
+            // Seleccionamos el primer punto que no sea borde(valor=-1)Comprobamos que el punto no sea un borde
             if(imgRegiones.at<int>(i,j) == -1 && detected_edges.at<uchar>(i,j) != 255){
                 seedPoint.x = j;
                 seedPoint.y = i;
@@ -353,15 +356,15 @@ void MainWindow::segmentation(){
 
                 grisAcum = 0;
                 r.nPuntos = 0;
-                for(int k = minRect.x; k < minRect.x+minRect.width; k++){   //columnas
+                for(int k = minRect.x; k < minRect.x+minRect.width; k++){       //columnas
                     for(int z = minRect.y; z < minRect.y+minRect.height; z++){  //filas
                         if(imgMask.at<uchar>(z+1, k+1) == 1 && imgRegiones.at<int>(z, k) == -1){
                             r.id = idReg;
                             r.nPuntos++;
-                            r.pIni = Point(k,z);                                //Point(columna, fila)
+                            r.pIni = Point(k,z);    //Point(columna, fila)
                             grisAcum += grayImage.at<uchar>(z, k);
+                            imgRegiones.at<int>(z, k) = idReg;
                         }
-                        imgRegiones.at<int>(z, k) = idReg;
                     }
                 }
                 r.gMedio = grisAcum / r.nPuntos;
@@ -370,10 +373,7 @@ void MainWindow::segmentation(){
             }
         }
     }
-
-
     // ######### POST-PROCESAMIENTO #########
-
     asignarBordesARegion();
 }
 
@@ -478,31 +478,38 @@ void MainWindow::initDisparity()
 {
     Mat result; //resultado en (0,0) de tipo float
     float mejorR; //mejor resultado
-    result.create(1, 1, CV_32F);
+    //result.create(1, 1, CV_32FC1);
     float umbral = 0.8;
     int xD = 0;
     int mejorxD = 0;
 
+    fijos.setTo(0);
+    disparidad.setTo(0);
+
+    // Algoritmo de correspondencia de esquinas de la imagen izquierda y la imagen derecha
     for(size_t it = 0; it < cornerList.size(); it++){
         int xI = cornerList[it].point.x;
         int yI = cornerList[it].point.y;
-        result.setTo(0);    //Resultado de similitud
+        result.setTo(0);    //Resultado de similitud inicializado a cero
         mejorR = 0;         //Mejor valor de similtud hasta ahora
+        int ncorners = 0;
         for(xD = 0; xD < cornersD.cols; xD++){
-            if((xI-W/2) >= 0 && (xI+W/2) < 320 && (xD-W/2) >= 0 && (xD+W/2) < 320 && (yI-W/2) >= 0 && (yI+W/2)<240){
-                if(cornersD.at<uchar>(yI, xD) == 1){
-                    Mat winI = destGrayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
-                    Mat winD = grayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
+            if((xI-W/2) >= 0 && (xI+W/2) < 320 && (xD-W/2) >= 0 && (xD+W/2) < 320 && (yI-W/2) >= 0 && (yI+W/2)<240){ // Comprobamos el rango de ventana
+                if(cornersD.at<uchar>(yI, xD) == 1){        //Comprobamos si es una esquina
+                    Mat winI = grayImage(cv::Rect(xI-W/2, yI-W/2, W, W));
+                    Mat winD = destGrayImage(cv::Rect(xD-W/2, yI-W/2, W, W));
                     matchTemplate(winI,winD,result,TM_CCOEFF_NORMED);
-                    if(result.at<float>(0) >= mejorR){
-                        mejorR = result.at<float>(0);
+                    if(result.at<float>(0,0) >= mejorR){    //Guardamos la esquina homóloga
+                        mejorR = result.at<float>(0,0);
                         mejorxD = xD;
                     }
+                    ncorners++;
                 }
             }
         }
+
         //Comprobamos si cumple un valor de correspondencia aceptable
-        if(mejorR >= umbral){
+        if(mejorR >= umbral && (xI - mejorR) > 0){
             fijos.at<uchar>(yI, xI) = 1;
             disparidad.at<float>(yI, xI) = xI - mejorxD;
         }
@@ -514,12 +521,13 @@ void MainWindow::initDisparity()
  */
 void MainWindow::initDisparity2()
 {
+    // Inicializamos el valor de la disparidad media y el numero de puntos fijos por cada region
     int id = 0;
     for(size_t i = 0; i < listRegiones.size(); i++){
         listRegiones[i].dMedia = 0;
         listRegiones[i].nPuntosFijos = 0;
     }
-
+    // Calculo de la disparidad media
     for(int i = 0; i < imgRegiones.rows; i++){
         for(int j = 0; j < imgRegiones.cols; j++){
             if(fijos.at<uchar>(i,j) == 1){
@@ -529,13 +537,10 @@ void MainWindow::initDisparity2()
             }
         }
     }
-
-    for(int i = 0; i < imgRegiones.rows; i++){
+    // Asignamos la disparidad media a los puntos de las regiones sin valor de disparidad.
+    for(size_t   i = 0; i < listRegiones.size(); i++){
         if(listRegiones[i].nPuntosFijos > 0){
             listRegiones[i].dMedia = listRegiones[i].dMedia / listRegiones[i].nPuntosFijos;
-        }
-        else{
-            listRegiones[i].dMedia = 0;
         }
     }
 }
@@ -545,7 +550,6 @@ void MainWindow::initDisparity2()
  */
 void MainWindow::printCorners()
 {
-    initDisparity();
     if(!cornerList.empty()){
         for(size_t i = 0; i < cornerList.size();i++){
             if(fijos.at<uchar>(cornerList[i].point.y, cornerList[i].point.x) == 0){
@@ -553,29 +557,24 @@ void MainWindow::printCorners()
             }
             else{
                 visorS->drawSquare(QPointF(cornerList[i].point.x,cornerList[i].point.y), 3,3, Qt::green);
+                int puntoX = cornerList[i].point.x - disparidad.at<float>(cornerList[i].point.y, cornerList[i].point.x);
+                visorD->drawSquare(QPointF(puntoX, cornerList[i].point.y), 3,3, Qt::green);
             }
         }
     }
-
-    if(!cornerListD.empty()){
-        for(size_t i = 0; i < cornerListD.size(); i++){
-            if(fijos.at<uchar>(cornerListD[i].point.y, cornerListD[i].point.x) == 0){
-                visorD->drawSquare(QPointF(cornerListD[i].point.x, cornerListD[i].point.y), 3,3, Qt::red);
-            }
-            else{
-                visorD->drawSquare(QPointF(cornerListD[i].point.x, cornerListD[i].point.y), 3,3, Qt::green);
-            }
-        }
-    }
-
 }
 
 void MainWindow::printDisparity()
 {
     int gris = 0;
+
     for(int i = 0; i < destGrayImage2.rows; i++){
         for(int j = 0; j < destGrayImage2.cols; j++){
             gris = disparidad.at<float>(i,j) * 3. * width/320.; //Resolucion original de las camaras
+            if(gris>255)
+                gris = 255;
+            if(gris<0)
+                gris = 0;
             destGrayImage2.at<uchar>(i,j) = (uchar) gris;
         }
     }
