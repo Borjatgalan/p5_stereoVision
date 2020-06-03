@@ -82,6 +82,7 @@ private:
     Mat detected_edges; //Mat de bordes
     Mat canny_image;    //Mat de canny
     Mat fijos;          //Mat de puntos fijos de la imagen izquierda
+    Mat fijosDerecha;   //Mat de puntos fijos de la imagen derecha
     Mat disparidad;     //Mapa de disparidad
     Rect minRect;       //Minima ventana de los puntos modificados (añadidos a la region)
     Region r;           //Estructura de tipo Region
@@ -103,8 +104,6 @@ public slots:
     void loadFromFile2();
     void loadGroundTruth();
     void saveToFile();
-    void initialize();
-    void segmentation();
     void initVecinos();
     int vecinoMasSimilar(int x, int y);
     void asignarBordesARegion();
@@ -112,6 +111,8 @@ public slots:
 
     //Metodos practica 5
     void initProcess();
+    void initialize();
+    void segmentation();
     void cornerDetection();
     void initDisparity();
     void initDisparity2();
